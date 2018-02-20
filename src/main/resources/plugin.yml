@@ -1,0 +1,17 @@
+name: ${project.name}
+main: com.github.lazersmoke.PearlPearl.PearlPearl
+author: Lazersmoke
+version: ${project.version}
+depend: [CivModCore, NameLayer]
+commands:
+    ppunleash:
+        permission: pearlpearl.public
+    ppverify:
+        permission: pearlpearl.public
+    ppsmite:
+        permission: pearlpearl.admin
+permissions:
+    pearlpearl.public:
+        default: true
+    pearlpearl.admin:
+        default: op
