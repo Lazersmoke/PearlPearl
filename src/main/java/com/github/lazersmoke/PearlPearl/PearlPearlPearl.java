@@ -164,7 +164,7 @@ public final class PearlPearlPearl{
         Entity e = Bukkit.getEntity(droppedEntityId);
         if(e == null || !(e instanceof Item)){
           return false;
-  }
+        }
         return PearlPearlPearl.fromItemStack(((Item) e).getItemStack()).filter(p -> pearl.uniqueId.equals(p.uniqueId)).isPresent();
       }
 

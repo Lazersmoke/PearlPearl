@@ -107,8 +107,22 @@ public final class PearlPearlListener implements Listener{
       case PICKUP_HALF:
       case PICKUP_ONE:
         PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId())));
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId())));
-
+      // Cursor -> Inventory
+      case PLACE_ALL:
+      case PLACE_SOME:
+      case PLACE_ONE:
+        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
+          Function<InventoryView,Inventory> getInventory = e.getRawSlot() < event.getView().getTopInventory().getSize() ? InventoryView::getTopInventory : InventoryView::getBottomInventory;
+          Optional<PearlHolder> holder = PearlPearlPearl.fromInventoryHolder(getInventory.apply(e.getView()).getHolder());
+          /* Java 9:
+          holder.ifPresentOrElse(pearl::setHolder,...);
+          */
+          if(holder.isPresent){
+            pearl.setHolder(holder.get());
+          }else{
+            Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid InventoryHolder :V"));
+          }
+        });
     }
   }
 }
