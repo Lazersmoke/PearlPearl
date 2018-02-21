@@ -12,12 +12,17 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.Comparator;
+import java.util.function.Function;
 import vg.civcraft.mc.namelayer.NameAPI;
+import net.md_5.bungee.api.ChatColor;
 
 public final class PearlPearlListener implements Listener{
   private static final Map<UUID,AttackRecord> attacks = new HashMap<UUID,AttackRecord>();
@@ -107,22 +112,66 @@ public final class PearlPearlListener implements Listener{
       case PICKUP_HALF:
       case PICKUP_ONE:
         PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId())));
+        break;
       // Cursor -> Inventory
       case PLACE_ALL:
       case PLACE_SOME:
       case PLACE_ONE:
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
-          Function<InventoryView,Inventory> getInventory = e.getRawSlot() < event.getView().getTopInventory().getSize() ? InventoryView::getTopInventory : InventoryView::getBottomInventory;
-          Optional<PearlHolder> holder = PearlPearlPearl.fromInventoryHolder(getInventory.apply(e.getView()).getHolder());
+        PearlPearlPearl.fromItemStack(e.getCursor()).ifPresent(pearl -> {
           /* Java 9:
           holder.ifPresentOrElse(pearl::setHolder,...);
           */
-          if(holder.isPresent){
+          Optional<PearlPearlPearl.PearlHolder> holder = getInvHolder(e).flatMap(PearlPearlPearl.PearlHolder::fromInventory);
+          if(holder.isPresent()){
             pearl.setHolder(holder.get());
           }else{
-            Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid InventoryHolder :V"));
+            Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
           }
         });
+        break;
+      // Shift click
+      case MOVE_TO_OTHER_INVENTORY:
+        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
+          /* Java 9:
+          holder.ifPresentOrElse(pearl::setHolder,...);
+          */
+          getInvHolder(e).ifPresent(holder -> {
+            if(holder.getInventory().firstEmpty() >= 0){
+	      Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
+	      if(pholder.isPresent()){
+		pearl.setHolder(pholder.get());
+	      }else{
+		Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
+	      }
+	    }
+	  });
+	});
+	break;
+      case HOTBAR_SWAP:
+        PearlPearlPearl.fromItemStack(e.getWhoClicked().getInventory().getItem(e.getHotbarButton())).ifPresent(pearl -> {
+          Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(getInvHolder(e).get());
+          if(pholder.isPresent()){
+	    pearl.setHolder(pholder.get());
+	  }else{
+	    Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
+	  }
+	});
+	break;
+      case DROP_ALL_CURSOR:
+      case DROP_ONE_CURSOR:
+      case DROP_ALL_SLOT:
+      case DROP_ONE_SLOT:
+      	// Caught when item is created
+      	break;
+      default:
+      	if(PearlPearlPearl.fromItemStack(e.getCurrentItem()).isPresent() || PearlPearlPearl.fromItemStack(e.getCursor()).isPresent()){
+      	  ((Player) e.getWhoClicked()).sendMessage(ChatColor.RED + "You can't do that with a pearl, you monster!");
+	}
     }
+  }
+
+  private Optional<InventoryHolder> getInvHolder(InventoryClickEvent e){
+    Function<InventoryView,Inventory> getInv = e.getRawSlot() < e.getView().getTopInventory().getSize() ? InventoryView::getTopInventory : InventoryView::getBottomInventory;
+    return Optional.ofNullable(getInv.apply(e.getView()).getHolder());
   }
 }
