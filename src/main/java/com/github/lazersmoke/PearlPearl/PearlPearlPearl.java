@@ -134,7 +134,7 @@ public final class PearlPearlPearl{
 
       private Stream<ItemStack> allPlayerItems(org.bukkit.entity.Player p){
         Stream<ItemStack> mainInv = Arrays.stream(p.getInventory().getContents());
-        Stream<ItemStack> craftingInv = p.getOpenInventory().getType() != InventoryType.CHEST ? Arrays.stream(p.getOpenInventory().getTopInventory().getContents()) : Stream.empty();
+        Stream<ItemStack> craftingInv = Arrays.stream(p.getOpenInventory().getTopInventory().getContents());
         Stream<ItemStack> cursorInv = Stream.of(p.getItemOnCursor());
         return Stream.of(mainInv,craftingInv,cursorInv).flatMap(s -> s);
       }
@@ -207,8 +207,8 @@ public final class PearlPearlPearl{
 
       private Stream<ItemStack> allInventoryItems(Inventory inv){
         Stream<ItemStack> mainInv = Arrays.stream(inv.getContents());
-        Stream<ItemStack> cursorInv = inv.getViewers().stream().map(HumanEntity::getItemOnCursor);
-        return Stream.of(mainInv,cursorInv).flatMap(s -> s);
+        //Stream<ItemStack> cursorInv = inv.getViewers().stream().map(HumanEntity::getItemOnCursor);
+        return Stream.of(mainInv/*,cursorInv*/).flatMap(s -> s);
       }
 
       public Location getLocation(){
@@ -287,12 +287,11 @@ public final class PearlPearlPearl{
 
   public ItemStack getItemRepr(){
     ItemStack pearl = new ItemStack(Material.ENDER_PEARL);
-    ISUtils.setName(pearl,NameAPI.getCurrentName(pearledId));
-    ISUtils.addLore(pearl,ChatColor.DARK_PURPLE + "This is a pearl pearl, uh, pearl");
-    for(String s : getDetail()){
-      ISUtils.addLore(pearl,s);
-    }
     ItemMeta im = pearl.getItemMeta();
+    im.setDisplayName(NameAPI.getCurrentName(pearledId));
+    List<String> lore = getDetail();
+    lore.add(0,ChatColor.DARK_PURPLE + "This is a pearl pearl, uh, pearl");
+    im.setLore(lore);
     im.addEnchant(Enchantment.DURABILITY, 1, true);
     im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
     pearl.setItemMeta(im);

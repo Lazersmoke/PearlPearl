@@ -98,6 +98,12 @@ public class PearlPearlPearlListGUI{
 
   private Clickable createPearlDetail(PearlPearlPearl pearl) {
     ItemStack toShow = pearl.getItemRepr();
+    ItemMeta im = toShow.getItemMeta();
+    List<String> lore = im.getLore();
+    // This is so the pearl doesn't appear to be an actual one to the detection alg
+    lore.set(4,ChatColor.DARK_GRAY + "Verified " + lore.get(4));
+    im.setLore(lore);
+    toShow.setItemMeta(im);
     return new Clickable(toShow) {
       @Override
       public void clicked(Player p) {

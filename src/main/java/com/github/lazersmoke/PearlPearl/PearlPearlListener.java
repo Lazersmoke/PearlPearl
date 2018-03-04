@@ -14,6 +14,7 @@ import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.Inventory;
@@ -106,24 +107,41 @@ public final class PearlPearlListener implements Listener{
     });
   }
 
-  @EventHandler(ignoreCancelled=true)
+  @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+  public void onDragPearl(InventoryDragEvent e){
+    e.getNewItems().keySet().stream().forEach(i -> PearlPearlPearl.fromItemStack(e.getNewItems().get(i)).ifPresent(pearl -> {
+      InventoryHolder holder = e.getView().convertSlot(i) == i ? e.getView().getTopInventory().getHolder() : e.getView().getBottomInventory().getHolder();
+      Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
+      if(pholder.isPresent()){
+        pearl.setHolder(pholder.get());
+      }else{
+        Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
+      }
+    }));
+  }
+
+  @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onClickPearl(InventoryClickEvent e){
+    boolean swapBetweenInventories = e.getRawSlot() < e.getView().getTopInventory().getSize();
     switch(e.getAction()){
       // Inventory -> Cursor
       case COLLECT_TO_CURSOR:
       case PICKUP_ALL:
       case PICKUP_HALF:
       case PICKUP_ONE:
+        if(!swapBetweenInventories){
+          return;
+        }
         PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId())));
         break;
       // Cursor -> Inventory
       case PLACE_ALL:
       case PLACE_SOME:
       case PLACE_ONE:
+        if(!swapBetweenInventories){
+          return;
+        }
         PearlPearlPearl.fromItemStack(e.getCursor()).ifPresent(pearl -> {
-          /* Java 9:
-          holder.ifPresentOrElse(pearl::setHolder,...);
-          */
           Optional<PearlPearlPearl.PearlHolder> holder = getInvHolder(e).flatMap(PearlPearlPearl.PearlHolder::fromInventory);
           if(holder.isPresent()){
             pearl.setHolder(holder.get());
@@ -135,23 +153,22 @@ public final class PearlPearlListener implements Listener{
       // Shift click
       case MOVE_TO_OTHER_INVENTORY:
         PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
-          /* Java 9:
-          holder.ifPresentOrElse(pearl::setHolder,...);
-          */
           getInvHolder(e,true).ifPresent(holder -> {
-            if(holder.getInventory().firstEmpty() >= 0){
+            if(holder.getInventory().addItem(e.getCurrentItem()).isEmpty()){
+              e.setCancelled(true);
+              e.getClickedInventory().removeItem(e.getCurrentItem());
               Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
-                if(pholder.isPresent()){
-                  pearl.setHolder(pholder.get());
-                }else{
-                  Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
-                }
+              if(pholder.isPresent()){
+                pearl.setHolder(pholder.get());
+              }else{
+                Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
+              }
             }
           });
         });
         break;
       case HOTBAR_SWAP:
-        boolean swapBetweenInventories = e.getRawSlot() < e.getView().getTopInventory().getSize();
+      case HOTBAR_MOVE_AND_READD:
         if(!swapBetweenInventories){
           return;
         }
@@ -170,15 +187,39 @@ public final class PearlPearlListener implements Listener{
           });
         });
         break;
+      case SWAP_WITH_CURSOR:
+        if(!swapBetweenInventories){
+          return;
+        }
+        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
+          pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId()));
+        });
+        PearlPearlPearl.fromItemStack(e.getCursor()).ifPresent(pearl -> {
+          getInvHolder(e).ifPresent(holder -> {
+            Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
+            if(pholder.isPresent()){
+              pearl.setHolder(pholder.get());
+            }else{
+              Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was hotbar swapped to an inventory, but that inventory wasn't a valid PearlHolder :V"));
+            }
+          });
+        });
+        break;
       case DROP_ALL_CURSOR:
       case DROP_ONE_CURSOR:
       case DROP_ALL_SLOT:
       case DROP_ONE_SLOT:
         // Caught when item is created
         break;
+      case NOTHING:
+        // No change in holder
+        break;
+      case CLONE_STACK:
+      case UNKNOWN:
       default:
         if(PearlPearlPearl.fromItemStack(e.getCurrentItem()).isPresent() || PearlPearlPearl.fromItemStack(e.getCursor()).isPresent()){
           ((Player) e.getWhoClicked()).sendMessage(ChatColor.RED + "You can't do that with a pearl, you monster!");
+          e.setCancelled(true);
         }
     }
   }
