@@ -5,10 +5,13 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.Location;
 import org.bukkit.GameMode;
 import org.bukkit.enchantments.Enchantment;
@@ -123,14 +126,15 @@ public final class PearlPearlPearl{
       // in creative, or holding the pearl in their inventory, crafting grid, or cursor
       public boolean verify(PearlPearlPearl pearl){
         return Optional.ofNullable(Bukkit.getPlayer(holdingPlayerId)).filter(player -> 
-          player.getGameMode().equals(GameMode.CREATIVE) || allPlayerItems(player).map(PearlPearlPearl::fromItemStack)
+          player.getGameMode() == GameMode.CREATIVE || allPlayerItems(player)
+          .map(PearlPearlPearl::fromItemStack)
           .flatMap(o -> o.map(Stream::of).orElse(Stream.empty()))// In Java 9: .flatMap(Optional::stream)
           .anyMatch(p -> p.uniqueId.equals(pearl.uniqueId))).isPresent();
       }
 
       private Stream<ItemStack> allPlayerItems(org.bukkit.entity.Player p){
         Stream<ItemStack> mainInv = Arrays.stream(p.getInventory().getContents());
-        Stream<ItemStack> craftingInv = Arrays.stream(p.getOpenInventory().getTopInventory().getContents());
+        Stream<ItemStack> craftingInv = p.getOpenInventory().getType() != InventoryType.CHEST ? Arrays.stream(p.getOpenInventory().getTopInventory().getContents()) : Stream.empty();
         Stream<ItemStack> cursorInv = Stream.of(p.getItemOnCursor());
         return Stream.of(mainInv,craftingInv,cursorInv).flatMap(s -> s);
       }
@@ -195,17 +199,16 @@ public final class PearlPearlPearl{
 
       public boolean verify(PearlPearlPearl pearl){
         return Optional.ofNullable(holdingBlockLocation.getBlock().getState()).filter(st -> st instanceof InventoryHolder).map(st -> 
-          Arrays.stream(((InventoryHolder) st).getInventory().getContents())
+          allInventoryItems(((InventoryHolder) st).getInventory())
           .map(PearlPearlPearl::fromItemStack)
           .flatMap(o -> o.map(Stream::of).orElse(Stream.empty()))// In Java 9: .flatMap(Optional::stream)
           .anyMatch(p -> p.uniqueId.equals(pearl.uniqueId))).orElse(false);
       }
 
-      private Stream<ItemStack> allPlayerItems(org.bukkit.entity.Player p){
-        Stream<ItemStack> mainInv = Arrays.stream(p.getInventory().getContents());
-        Stream<ItemStack> craftingInv = Arrays.stream(p.getOpenInventory().getTopInventory().getContents());
-        Stream<ItemStack> cursorInv = Stream.of(p.getItemOnCursor());
-        return Stream.of(mainInv,craftingInv,cursorInv).flatMap(s -> s);
+      private Stream<ItemStack> allInventoryItems(Inventory inv){
+        Stream<ItemStack> mainInv = Arrays.stream(inv.getContents());
+        Stream<ItemStack> cursorInv = inv.getViewers().stream().map(HumanEntity::getItemOnCursor);
+        return Stream.of(mainInv,cursorInv).flatMap(s -> s);
       }
 
       public Location getLocation(){
@@ -267,7 +270,7 @@ public final class PearlPearlPearl{
   }
 
   public void setHolder(PearlHolder newHolder){
-    Optional.ofNullable(Bukkit.getPlayer(pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RESET + "Your pearl is now held by " + ChatColor.GOLD + newHolder.getDisplay()));
+    Bukkit.getScheduler().runTask(PearlPearl.getInstance(), () -> Optional.ofNullable(Bukkit.getPlayer(pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RESET + "Your pearl is now held by " + ChatColor.GOLD + newHolder.getDisplay())));
     holder = newHolder;
   }
 

@@ -22,7 +22,7 @@ public final class PearlPearl extends ACivMod {
     // Load pearls
     PearlPearlPearl.loadPearls();
     // Aggro verifier
-    Bukkit.getScheduler().scheduleSyncRepeatingTask(this,() -> PearlPearlPearl.verifyAllPearls(),20L,1L);
+    Bukkit.getScheduler().scheduleSyncRepeatingTask(this,() -> PearlPearlPearl.verifyAllPearls(),20L,1L); 
     getServer().getPluginManager().registerEvents(listener, this);
     // Register commands
     PearlPearlCmdHandler handle = new PearlPearlCmdHandler();

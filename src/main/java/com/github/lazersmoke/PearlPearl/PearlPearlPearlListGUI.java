@@ -48,24 +48,18 @@ public class PearlPearlPearlListGUI{
       return;
     }
     ClickableInventory.forceCloseInventory(p);
-    ClickableInventory ci = new ClickableInventory(54, "Pearl List");
+    ClickableInventory ci = new ClickableInventory(54, "Pearl Pearls");
     Set<PearlPearlPearl> pearls = allPearls.entrySet().stream().map(Map.Entry::getValue).filter(pe -> pe.pearledId.equals(uuid)).collect(Collectors.toSet());
     if (pearls.size() < 45 * currentPage) {
       // would show an empty page, so go to previous
       currentPage--;
       showScreen();
     }
-    if (pearls.size() == 0) {
-      //item to indicate that there is nothing to claim
-      ItemStack noClaim = new ItemStack(Material.BARRIER);
-      ISUtils.setName(noClaim, ChatColor.GOLD + "No mana available");
-      ISUtils.addLore(noClaim, ChatColor.RED + "You currently have no mana");
-      ci.setSlot(new DecorationStack(noClaim), 4);
-    } else {
+    if (pearls.size() != 0) {
       int nextSlot = 0;
       for(PearlPearlPearl pearl : pearls.stream().skip(45 * currentPage).limit(45).collect(Collectors.toList())){
         ci.setSlot(createPearlDetail(pearl), nextSlot++);
-      };
+      }
     }
     // previous button
     if (currentPage > 0) {
@@ -99,17 +93,6 @@ public class PearlPearlPearlListGUI{
       };
       ci.setSlot(forCl, 53);
     }
-    // exit button
-    ItemStack backToOverview = new ItemStack(Material.WOOD_DOOR);
-    ISUtils.setName(backToOverview, ChatColor.GOLD + "Close");
-    ci.setSlot(new Clickable(backToOverview) {
-
-      @Override
-      public void clicked(Player arg0) {
-        // just let it close, dont do anything
-      }
-    }, 49);
-
     ci.showInventory(p);
   }
 
