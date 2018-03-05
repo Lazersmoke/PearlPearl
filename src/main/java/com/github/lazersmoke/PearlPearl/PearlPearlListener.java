@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import java.util.Comparator;
 import java.util.function.Function;
+import java.util.function.Consumer;
 import java.util.stream.IntStream;
 import vg.civcraft.mc.namelayer.NameAPI;
 import net.md_5.bungee.api.ChatColor;
@@ -161,88 +162,60 @@ public final class PearlPearlListener implements Listener{
 
   @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onClickPearl(InventoryClickEvent e){
-    boolean swapBetweenInventories = e.getRawSlot() < e.getView().getTopInventory().getSize();
+    // Did we click a non-player inventory?
+    boolean clickedOther = e.getRawSlot() < e.getView().getTopInventory().getSize();
+    Player clicker = (Player) e.getWhoClicked();
+    PearlPearlPearl.PearlHolder clickerHolder = new PearlPearlPearl.PearlHolder.Player(clicker.getUniqueId());
+    Optional<PearlPearlPearl.PearlHolder> otherHolder = Optional.ofNullable(e.getClickedInventory().getHolder()).flatMap(PearlPearlPearl.PearlHolder::fromInventory);
+    Optional<PearlPearlPearl> clickedPearl = PearlPearlPearl.fromItemStack(e.getCurrentItem());
+    Optional<PearlPearlPearl> cursorPearl = PearlPearlPearl.fromItemStack(e.getCursor());
     switch(e.getAction()){
       // Inventory -> Cursor
       case COLLECT_TO_CURSOR:
       case PICKUP_ALL:
       case PICKUP_HALF:
       case PICKUP_ONE:
-        if(!swapBetweenInventories){
-          return;
+        if(clickedOther){
+          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
         }
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId())));
         break;
       // Cursor -> Inventory
       case PLACE_ALL:
       case PLACE_SOME:
       case PLACE_ONE:
-        if(!swapBetweenInventories){
-          return;
+        if(clickedOther){
+          cursorPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
         }
-        PearlPearlPearl.fromItemStack(e.getCursor()).ifPresent(pearl -> {
-          Optional<PearlPearlPearl.PearlHolder> holder = getInvHolder(e).flatMap(PearlPearlPearl.PearlHolder::fromInventory);
-          if(holder.isPresent()){
-            pearl.setHolder(holder.get());
-          }else{
-            Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
-          }
-        });
         break;
       // Shift click
       case MOVE_TO_OTHER_INVENTORY:
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
-          getInvHolder(e,true).ifPresent(holder -> {
-            if(holder.getInventory().addItem(e.getCurrentItem()).isEmpty()){
-              e.setCancelled(true);
+        clickedPearl.ifPresent(pearl -> {
+          // The inventory the pearl will move to
+          Inventory destinationInv = clickedOther ? e.getView().getBottomInventory() : e.getView().getTopInventory();
+          ifPresentOrElse(Optional.ofNullable(destinationInv.getHolder()).flatMap(PearlPearlPearl.PearlHolder::fromInventory),pholder -> {
+            // If the PearlHolder is legitimate, use our own handling
+            e.setCancelled(true);
+            // If we successfully transferred the pearl
+            if(destinationInv.addItem(pearl.getItemRepr()).isEmpty()){
+              // Delete the old one and set the new holder
               e.getClickedInventory().removeItem(e.getCurrentItem());
-              Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
-              if(pholder.isPresent()){
-                pearl.setHolder(pholder.get());
-              }else{
-                Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
-              }
+              pearl.setHolder(pholder);
             }
-          });
+          },() -> denyClick(e));
         });
         break;
       case HOTBAR_SWAP:
       case HOTBAR_MOVE_AND_READD:
-        if(!swapBetweenInventories){
-          return;
+        if(clickedOther){
+          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
+          PearlPearlPearl.fromItemStack(clicker.getInventory().getItem(e.getHotbarButton())).ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
         }
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
-          pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId()));
-        });
-
-        PearlPearlPearl.fromItemStack(e.getWhoClicked().getInventory().getItem(e.getHotbarButton())).ifPresent(pearl -> {
-          getInvHolder(e).ifPresent(holder -> {
-            Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
-            if(pholder.isPresent()){
-              pearl.setHolder(pholder.get());
-            }else{
-              Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was hotbar swapped to an inventory, but that inventory wasn't a valid PearlHolder :V"));
-            }
-          });
-        });
         break;
       case SWAP_WITH_CURSOR:
-        if(!swapBetweenInventories){
-          return;
+        if(clickedOther){
+          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
+          cursorPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
         }
-        PearlPearlPearl.fromItemStack(e.getCurrentItem()).ifPresent(pearl -> {
-          pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(((Player) e.getWhoClicked()).getUniqueId()));
-        });
-        PearlPearlPearl.fromItemStack(e.getCursor()).ifPresent(pearl -> {
-          getInvHolder(e).ifPresent(holder -> {
-            Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
-            if(pholder.isPresent()){
-              pearl.setHolder(pholder.get());
-            }else{
-              Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was hotbar swapped to an inventory, but that inventory wasn't a valid PearlHolder :V"));
-            }
-          });
-        });
         break;
       case DROP_ALL_CURSOR:
       case DROP_ONE_CURSOR:
@@ -256,20 +229,23 @@ public final class PearlPearlListener implements Listener{
       case CLONE_STACK:
       case UNKNOWN:
       default:
-        if(PearlPearlPearl.fromItemStack(e.getCurrentItem()).isPresent() || PearlPearlPearl.fromItemStack(e.getCursor()).isPresent()){
-          ((Player) e.getWhoClicked()).sendMessage(ChatColor.RED + "You can't do that with a pearl, you monster!");
-          e.setCancelled(true);
+        if(clickedPearl.isPresent() || cursorPearl.isPresent()){
+          denyClick(e);
         }
     }
   }
 
-  private Optional<InventoryHolder> getInvHolder(InventoryClickEvent e){
-    return getInvHolder(e,false);
+  private <T> void ifPresentOrElse(Optional<T> o, Consumer<T> f, Runnable def){
+    if(o.isPresent()){
+      f.accept(o.get());
+    }else{
+      def.run();
+    }
   }
 
-  private Optional<InventoryHolder> getInvHolder(InventoryClickEvent e, boolean inverted){
-    Function<InventoryView,Inventory> getInv = inverted ^ (e.getRawSlot() < e.getView().getTopInventory().getSize()) ? InventoryView::getTopInventory : InventoryView::getBottomInventory;
-    return Optional.ofNullable(getInv.apply(e.getView()).getHolder());
+  private void denyClick(InventoryClickEvent e){
+    e.getWhoClicked().sendMessage(ChatColor.RED + "You can't do that with a pearl, you monster!");
+    e.setCancelled(true);
   }
 
   // Make pearls invincible except to void damage
@@ -293,7 +269,7 @@ public final class PearlPearlListener implements Listener{
     if(!(e.getEntity() instanceof EnderPearl)){
       return;
     }
-    Player p = (Player)e.getEntity().getShooter();
+    Player p = (Player) e.getEntity().getShooter();
     if(p == null){
       return;
     }
