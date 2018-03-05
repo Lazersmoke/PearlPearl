@@ -3,11 +3,9 @@ package com.github.lazersmoke.PearlPearl;
 import vg.civcraft.mc.civmodcore.command.PlayerCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.command.CommandSender;
-import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 import java.util.LinkedList;
-import java.util.Set;
 
 public class PearlPearlCmdVerify extends PlayerCommand {
   public PearlPearlCmdVerify(String name) {

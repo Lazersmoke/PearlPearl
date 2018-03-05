@@ -12,19 +12,25 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
+import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.entity.EntityPortalEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.Comparator;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import vg.civcraft.mc.namelayer.NameAPI;
 import net.md_5.bungee.api.ChatColor;
 
@@ -94,7 +100,7 @@ public final class PearlPearlListener implements Listener{
     });
   }
 
-  @EventHandler(ignoreCancelled=true)
+  @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onPickupPearl(EntityPickupItemEvent e){
     if(!(e.getEntity() instanceof Player)){
       return;
@@ -105,6 +111,39 @@ public final class PearlPearlListener implements Listener{
       pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(p.getUniqueId()));
       i.setItemStack(pearl.getItemRepr());
     });
+  }
+
+  @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+  public void onPearlDespawn(ItemDespawnEvent e){
+    e.setCancelled(PearlPearlPearl.fromItemStack(e.getEntity().getItemStack()).isPresent());
+  }
+
+  @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+  public void onChunkUnload(ChunkUnloadEvent e) {
+    e.setCancelled(Arrays.stream(e.getChunk().getEntities()).anyMatch(i -> i instanceof Item && PearlPearlPearl.fromItemStack(((Item) i).getItemStack()).isPresent()));
+    
+  }
+
+  @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+  public void onPlayerQuit(PlayerQuitEvent e) {
+    Player p = e.getPlayer();
+
+    // Ignore if a player is just turning into a combat logger
+    if(PearlPearl.isTagged(p.getUniqueId())){
+      return;
+    }
+
+    Inventory inv = p.getInventory();
+    IntStream.range(0,inv.getSize())
+      // On all the pearls
+      .filter(i -> PearlPearlPearl.fromItemStack(inv.getItem(i)).isPresent())
+      .forEach(i -> {
+        // Drop in world
+        p.getWorld().dropItemNaturally(p.getLocation(), inv.getItem(i));
+        // Remove from player inventory
+        inv.clear(i);
+      });
+    p.saveData();
   }
 
   @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
@@ -249,9 +288,9 @@ public final class PearlPearlListener implements Listener{
     });
   }
 
-  @EventHandler(ignoreCancelled = true)
-  public void onPearlThrow(ProjectileLaunchEvent e) {
-    if (!(e.getEntity() instanceof EnderPearl)) {
+  @EventHandler(ignoreCancelled=true)
+  public void onPearlThrow(ProjectileLaunchEvent e){
+    if(!(e.getEntity() instanceof EnderPearl)){
       return;
     }
     Player p = (Player)e.getEntity().getShooter();
@@ -264,5 +303,10 @@ public final class PearlPearlListener implements Listener{
       // Need to schedule this or else the re-created pearl doesn't show up
       Bukkit.getScheduler().scheduleSyncDelayedTask(PearlPearl.getInstance(), () -> p.getInventory().setItemInMainHand(pearl.getItemRepr()));
     });
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onPearlPortal(EntityPortalEvent e) {
+    e.setCancelled(e.getEntity() instanceof Item && PearlPearlPearl.fromItemStack(((Item) e.getEntity()).getItemStack()).isPresent());
   }
 }

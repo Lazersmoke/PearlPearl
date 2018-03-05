@@ -3,11 +3,16 @@ main: com.github.lazersmoke.PearlPearl.PearlPearl
 author: Lazersmoke
 version: ${project.version}
 depend: [CivModCore, NameLayer]
+softdepend: [CombatTagPlus]
 commands:
     ppunleash:
         permission: pearlpearl.public
     ppverify:
         permission: pearlpearl.public
+    ppcheck:
+        permission: pearlpearl.admin
+    ppaggro:
+        permission: pearlpearl.admin
     ppsmite:
         permission: pearlpearl.admin
 permissions:

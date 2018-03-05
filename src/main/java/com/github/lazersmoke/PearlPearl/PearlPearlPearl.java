@@ -337,7 +337,6 @@ public final class PearlPearlPearl{
   }
 
   public static void verifyAllPearls(){
-    LinkedList<PearlPearlPearl> pearls = new LinkedList<PearlPearlPearl>(allPearls.values());
-    pearls.forEach(PearlPearlPearl::aggroVerify);
+    new LinkedList<PearlPearlPearl>(allPearls.values()).forEach(PearlPearlPearl::aggroVerify);
   }
 }

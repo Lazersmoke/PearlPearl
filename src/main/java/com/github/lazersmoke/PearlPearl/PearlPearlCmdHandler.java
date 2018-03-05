@@ -7,6 +7,8 @@ public class PearlPearlCmdHandler extends CommandHandler{
   public void registerCommands() {
     addCommands(new PearlPearlCmdUnleash("Unleash"));
     addCommands(new PearlPearlCmdVerify("Verify"));
+    addCommands(new PearlPearlCmdCheck("Check"));
+    addCommands(new PearlPearlCmdAggro("Aggro"));
     addCommands(new PearlPearlCmdSmite("Smite"));
   }
 }

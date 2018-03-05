@@ -3,6 +3,9 @@ package com.github.lazersmoke.PearlPearl;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.ConfigurationSection;
 import java.io.File;
+import java.util.Optional;
+import java.util.UUID;
+import net.minelink.ctplus.CombatTagPlus;
 import vg.civcraft.mc.civmodcore.ACivMod;
 
 public final class PearlPearl extends ACivMod {
@@ -21,8 +24,8 @@ public final class PearlPearl extends ACivMod {
     config.reloadConfig(this.getConfig());
     // Load pearls
     PearlPearlPearl.loadPearls();
-    // Aggro verifier
-    Bukkit.getScheduler().scheduleSyncRepeatingTask(this,() -> PearlPearlPearl.verifyAllPearls(),20L,1L); 
+    // Enable aggro verifier
+    PearlPearlCmdAggro.enableAggro();
     getServer().getPluginManager().registerEvents(listener, this);
     // Register commands
     PearlPearlCmdHandler handle = new PearlPearlCmdHandler();
@@ -58,5 +61,12 @@ public final class PearlPearl extends ACivMod {
 
   public static PearlPearlDAO getDAO(){
     return dao;
+  }
+
+  public static boolean isTagged(UUID u){
+    if(Bukkit.getPluginManager().getPlugin("CombatTagPlus") != null){
+      return ((CombatTagPlus) Bukkit.getPluginManager().getPlugin("CombatTagPlus")).getTagManager().isTagged(u);
+    }
+    return false;
   }
 }
