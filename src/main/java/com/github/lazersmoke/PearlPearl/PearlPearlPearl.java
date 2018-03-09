@@ -5,38 +5,23 @@ import org.bukkit.inventory.ItemFlag;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Item;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.Location;
-import org.bukkit.GameMode;
 import org.bukkit.enchantments.Enchantment;
-import org.bukkit.block.Chest;
-import org.bukkit.block.Furnace;
-import org.bukkit.block.Dispenser;
-import org.bukkit.block.Dropper;
-import org.bukkit.block.Hopper;
-import org.bukkit.block.BrewingStand;
-import org.bukkit.block.DoubleChest;
-import org.bukkit.block.BlockState;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.UUID;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
-import java.nio.ByteBuffer;
-import java.util.function.Function;
 import vg.civcraft.mc.civmodcore.itemHandling.ISUtils;
 import vg.civcraft.mc.namelayer.NameAPI;
 import net.md_5.bungee.api.ChatColor;
@@ -49,199 +34,17 @@ public final class PearlPearlPearl{
   public final UUID pearledId;
   public final UUID pearlerId;
   public final Instant timePearled;
-  private PearlHolder holder;
+  private final Set<PearlPearlBehavior> behaviors = new HashSet<PearlPearlBehavior>();
+  private PearlPearlHolder holder;
+  private long damage;
 
-  public enum PearlHolderType{
-    PLAYER(0,PearlHolder.Player::deserialize),
-    DROPPED(1,PearlHolder.Dropped::deserialize),
-    BLOCK(2,PearlHolder.Block::deserialize);
-
-    public static final Map<Integer,PearlHolderType> holderTypes = new HashMap<Integer,PearlHolderType>();
-    static{
-      for(PearlHolderType t : PearlHolderType.values()){
-        holderTypes.put(t.magic,t);
-      }
-    }
-    public final Function<byte[],PearlHolder> deserialize;
-    public final int magic;
-
-    private PearlHolderType(int magic, Function<byte[],PearlHolder> f){
-      this.magic = magic;
-      this.deserialize = f;
-    }
-  }
-
-  public static PearlHolder deserializePearlHolder(int type, byte[] data){
-    return PearlHolderType.holderTypes.get(type).deserialize.apply(data);
-  }
-
-  public static abstract class PearlHolder{
-    public abstract boolean verify(PearlPearlPearl pearl);
-    public abstract Location getLocation();
-    public abstract String getDisplay();
-    public abstract byte[] serialize();
-    public final PearlHolderType type;
-
-    private PearlHolder(PearlHolderType t){
-      this.type = t;
-    }
-
-    private static byte[] getBytesFromUUID(UUID uuid) {
-      ByteBuffer bb = ByteBuffer.wrap(new byte[16]);
-      bb.putLong(uuid.getMostSignificantBits());
-      bb.putLong(uuid.getLeastSignificantBits());
-      return bb.array();
-    }
-
-    private static UUID getUUIDFromBytes(byte[] bytes) {
-      ByteBuffer byteBuffer = ByteBuffer.wrap(bytes);
-      Long high = byteBuffer.getLong();
-      Long low = byteBuffer.getLong();
-      return new UUID(high, low);
-    }
-
-    
-    public static Optional<PearlHolder> fromInventory(InventoryHolder holder){
-      if(holder instanceof Chest || holder instanceof Furnace || holder instanceof Dispenser || holder instanceof Dropper || holder instanceof Hopper || holder instanceof BrewingStand){
-        return Optional.of(new Block(((BlockState)holder).getLocation()));
-      // DoubleChest is not a BlockState -.-
-      }else if(holder instanceof DoubleChest) {
-        return Optional.of(new Block(((DoubleChest)holder).getLocation()));
-      }else if(holder instanceof org.bukkit.entity.Player) {
-        return Optional.of(new Player(((org.bukkit.entity.Player)holder).getUniqueId()));
-      }else{
-        return Optional.empty();
-      }
-    }
-
-    public static final class Player extends PearlHolder{
-      private final UUID holdingPlayerId;
-
-      public Player(UUID holdingPlayer){
-        super(PearlHolderType.PLAYER);
-        this.holdingPlayerId = holdingPlayer;
-      }
-
-      // Verifies that the holding player is online, and that they are either
-      // in creative, or holding the pearl in their inventory, crafting grid, or cursor
-      public boolean verify(PearlPearlPearl pearl){
-        return Optional.ofNullable(Bukkit.getPlayer(holdingPlayerId)).filter(player -> 
-          player.getGameMode() == GameMode.CREATIVE || allPlayerItems(player)
-          .map(PearlPearlPearl::fromItemStack)
-          .flatMap(o -> o.map(Stream::of).orElse(Stream.empty()))// In Java 9: .flatMap(Optional::stream)
-          .anyMatch(p -> p.uniqueId.equals(pearl.uniqueId))).isPresent();
-      }
-
-      private Stream<ItemStack> allPlayerItems(org.bukkit.entity.Player p){
-        Stream<ItemStack> mainInv = Arrays.stream(p.getInventory().getContents());
-        Stream<ItemStack> craftingInv = Arrays.stream(p.getOpenInventory().getTopInventory().getContents());
-        Stream<ItemStack> cursorInv = Stream.of(p.getItemOnCursor());
-        return Stream.of(mainInv,craftingInv,cursorInv).flatMap(s -> s);
-      }
-
-      public Location getLocation(){
-        return Bukkit.getPlayer(holdingPlayerId).getLocation();
-      }
-
-      public String getDisplay(){
-        return NameAPI.getCurrentName(holdingPlayerId) + Optional.ofNullable(Bukkit.getPlayer(holdingPlayerId)).map(p -> " at " + showLocation(p.getLocation())).orElse(" somewhere");
-      }
-
-      public byte[] serialize(){
-        return getBytesFromUUID(holdingPlayerId);
-      }
-
-      public static Player deserialize(byte[] b){
-        return new Player(getUUIDFromBytes(b));
-      }
-    }
-
-    public static final class Dropped extends PearlHolder{
-      private final UUID droppedEntityId;
-
-      public Dropped(UUID droppedEntity){
-        super(PearlHolderType.DROPPED);
-        this.droppedEntityId = droppedEntity;
-      }
-
-      public boolean verify(PearlPearlPearl pearl){
-        Entity e = Bukkit.getEntity(droppedEntityId);
-        if(e == null || !(e instanceof Item)){
-          return false;
-        }
-        return PearlPearlPearl.fromItemStack(((Item) e).getItemStack()).filter(p -> pearl.uniqueId.equals(p.uniqueId)).isPresent();
-      }
-
-      public Location getLocation(){
-        return Bukkit.getEntity(droppedEntityId).getLocation();
-      }
-
-      public String getDisplay(){
-        return "a dropped item" + Optional.ofNullable(Bukkit.getEntity(droppedEntityId)).map(e -> " at " + showLocation(e.getLocation())).orElse(" somewhere");
-      }
-
-      public byte[] serialize(){
-        return getBytesFromUUID(droppedEntityId);
-      }
-
-      public static Dropped deserialize(byte[] b){
-        return new Dropped(getUUIDFromBytes(b));
-      }
-    }
-
-    public static final class Block extends PearlHolder{
-      private final Location holdingBlockLocation;
-
-      public Block(Location holdingBlockLocation){
-        super(PearlHolderType.BLOCK);
-        this.holdingBlockLocation = holdingBlockLocation;
-      }
-
-      public boolean verify(PearlPearlPearl pearl){
-        return Optional.ofNullable(holdingBlockLocation.getBlock().getState()).filter(st -> st instanceof InventoryHolder).map(st -> 
-          allInventoryItems(((InventoryHolder) st).getInventory())
-          .map(PearlPearlPearl::fromItemStack)
-          .flatMap(o -> o.map(Stream::of).orElse(Stream.empty()))// In Java 9: .flatMap(Optional::stream)
-          .anyMatch(p -> p.uniqueId.equals(pearl.uniqueId))).orElse(false);
-      }
-
-      private Stream<ItemStack> allInventoryItems(Inventory inv){
-        Stream<ItemStack> mainInv = Arrays.stream(inv.getContents());
-        //Stream<ItemStack> cursorInv = inv.getViewers().stream().map(HumanEntity::getItemOnCursor);
-        return Stream.of(mainInv/*,cursorInv*/).flatMap(s -> s);
-      }
-
-      public Location getLocation(){
-        return holdingBlockLocation;
-      }
-
-      public String getDisplay(){
-        return Optional.of(holdingBlockLocation.getBlock().getState()).filter(st -> st instanceof InventoryHolder).map(st -> "a " + ((InventoryHolder) st).getInventory().getName()).orElse("something") + " at " + showLocation(holdingBlockLocation);
-      }
-
-      public byte[] serialize(){
-        ByteBuffer bb = ByteBuffer.wrap(new byte[16 + 12]);
-        bb.putLong(holdingBlockLocation.getWorld().getUID().getMostSignificantBits());
-        bb.putLong(holdingBlockLocation.getWorld().getUID().getLeastSignificantBits());
-        bb.putInt(holdingBlockLocation.getBlockX());
-        bb.putInt(holdingBlockLocation.getBlockY());
-        bb.putInt(holdingBlockLocation.getBlockZ());
-        return bb.array();
-      }
-
-      public static Block deserialize(byte[] b){
-        ByteBuffer bb = ByteBuffer.wrap(b);
-        return new Block(new Location(Bukkit.getWorld(new UUID(bb.getLong(),bb.getLong())), bb.getInt(), bb.getInt(), bb.getInt()));
-      }
-    }
-  }
-
-  public PearlPearlPearl(UUID uniqueId, UUID pearledId, UUID pearlerId, Instant timePearled, PearlHolder holder){
+  public PearlPearlPearl(UUID uniqueId, UUID pearledId, UUID pearlerId, Instant timePearled, PearlPearlHolder holder, long damage){
     this.uniqueId = uniqueId;
     this.pearledId = pearledId;
     this.pearlerId = pearlerId;
     this.timePearled = timePearled;
     this.holder = holder;
+    this.damage = damage;
   }
 
   public static PearlPearlPearl makePearlingHappen(UUID pearled, Player pearler){
@@ -249,39 +52,57 @@ public final class PearlPearlPearl{
     String pearlerName = NameAPI.getCurrentName(pearler.getUniqueId());
     pearler.sendMessage(ChatColor.GREEN + "You pearled " + ChatColor.AQUA + pearledName);
     Optional.ofNullable(Bukkit.getPlayer(pearled)).ifPresent(p -> p.sendMessage(ChatColor.GOLD + "You got pearled by " + ChatColor.AQUA + pearlerName));
-    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlHolder.Player(pearler.getUniqueId()));
+    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlPearlHolder.Player(pearler.getUniqueId()), 0);
+    allPearls.put(pearl.uniqueId,pearl);
+    dao.addNewPearl(pearl);
     ItemStack pearlItem = pearl.getItemRepr();
     // If the pearl couldn't fit in their inventory...
     if(pearler.getInventory().addItem(pearlItem).size() != 0){
       // ... drop it on the ground
       Item droppedPearl = pearler.getWorld().dropItem(pearler.getLocation().add(0,0.5,0),pearlItem);
       droppedPearl.setPickupDelay(10);
-      pearl.setHolder(new PearlHolder.Dropped(droppedPearl.getUniqueId()));
+      pearl.setHolder(new PearlPearlHolder.Dropped(droppedPearl.getUniqueId()));
     }else{
-      pearl.setHolder(new PearlHolder.Player(pearler.getUniqueId()));
+      pearl.setHolder(new PearlPearlHolder.Player(pearler.getUniqueId()));
     }
-    allPearls.put(pearl.uniqueId,pearl);
-    dao.addNewPearl(pearl);
     return pearl;
   }
 
-  public PearlHolder getHolder(){
+  public PearlPearlHolder getHolder(){
     return holder;
   }
 
-  public void setHolder(PearlHolder newHolder){
-    Bukkit.getScheduler().runTask(PearlPearl.getInstance(), () -> Optional.ofNullable(Bukkit.getPlayer(pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RESET + "Your pearl is now held by " + ChatColor.GOLD + newHolder.getDisplay())));
+  public long getDamage(){
+    return damage;
+  }
+
+  public void setHolder(PearlPearlHolder newHolder){
+    Bukkit.getScheduler().runTask(PearlPearl.getInstance(), () -> {
+      Optional.ofNullable(Bukkit.getPlayer(pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RESET + "Your pearl is now held by " + ChatColor.GOLD + newHolder.getDisplay()));
+    });
     holder = newHolder;
+    Bukkit.getScheduler().runTaskAsynchronously(PearlPearl.getInstance(), () -> dao.updateHolder(this));
+  }
+
+  public static Optional<PearlPearlPearl> updateItemStack(ItemStack i, Consumer<ItemStack> update){
+    Optional<UUID> pearlId = pearlIdFromItemStack(i);
+    Optional<PearlPearlPearl> pearl = pearlId.flatMap(u -> Optional.ofNullable(allPearls.get(u)));
+    pearlId.ifPresent(u -> PearlPearlListener.ifPresentOrElse(pearl,p -> update.accept(p.getItemRepr()), () -> update.accept(new ItemStack(Material.ENDER_PEARL))));
+    return pearl;
   }
 
   public static Optional<PearlPearlPearl> fromItemStack(ItemStack i){
+    return pearlIdFromItemStack(i).flatMap(u -> Optional.ofNullable(allPearls.get(u)));
+  }
+
+  public static Optional<UUID> pearlIdFromItemStack(ItemStack i){
     if(i == null || !i.hasItemMeta() || i.getItemMeta() == null || !i.getItemMeta().hasLore()){
       return Optional.empty();
     }
     try{
-      return Optional.ofNullable(allPearls.get(UUID.fromString(i.getItemMeta().getLore().get(4).substring(pearlIdPrefix.length()))));
+      return Optional.of(UUID.fromString(i.getItemMeta().getLore().get(4).substring(pearlIdPrefix.length())));
     } catch(Exception e){}
-    // None of the lore lines looks like a pearl id
+    // Doesn't look like a pearl
     return Optional.empty();
   }
 
@@ -290,7 +111,6 @@ public final class PearlPearlPearl{
     ItemMeta im = pearl.getItemMeta();
     im.setDisplayName(NameAPI.getCurrentName(pearledId));
     List<String> lore = getDetail();
-    lore.add(0,ChatColor.DARK_PURPLE + "This is a pearl pearl, uh, pearl");
     im.setLore(lore);
     im.addEnchant(Enchantment.DURABILITY, 1, true);
     im.addItemFlags(ItemFlag.HIDE_ENCHANTS);
@@ -303,6 +123,7 @@ public final class PearlPearlPearl{
     lines.add(ChatColor.RESET + "Held by " + ChatColor.GOLD + holder.getDisplay());
     lines.add(ChatColor.RESET + "Time pearled: " + ChatColor.DARK_GREEN + ChatColor.ITALIC + timePearled.toString());
     lines.add(ChatColor.RESET + "Pearled by: " + ChatColor.AQUA + NameAPI.getCurrentName(pearlerId));
+    lines.add(ChatColor.RESET + "Damage: " + ChatColor.GOLD + damage);
     lines.add(pearlIdPrefix + uniqueId.toString());
     return lines;
   }
@@ -316,27 +137,76 @@ public final class PearlPearlPearl{
     dao.loadPearls(allPearls);
   }
 
-  public void aggroVerify(){
-    if(!holder.verify(this)){
+  public Optional<Location> aggroVerify(){
+    Optional<Location> verifiedLocation = holder.verify(this);
+    if(!verifiedLocation.isPresent()){
       freePearl("pearl verification failed");
     }
+    return verifiedLocation;
   }
 
   public void freePearl(String reason){
-    dao.snipePearl(uniqueId);
+    Bukkit.getScheduler().runTaskAsynchronously(PearlPearl.getInstance(), () -> dao.snipePearl(uniqueId));
     allPearls.remove(uniqueId);
     Optional.ofNullable(Bukkit.getPlayer(pearledId)).ifPresent(p -> p.sendMessage(ChatColor.GREEN + "You were freed because " + reason));
   }
 
-  public static Map<UUID,PearlPearlPearl> getAllPearls(){
-    return allPearls;
-  }
-
-  public static String showLocation(Location l){
-    return l.getWorld().getName() + " [" + l.getBlockX() + " " + l.getBlockY() + " " + l.getBlockZ() + "]";
+  public static LinkedList<PearlPearlPearl> getAllPearlsSnapshot(){
+    return new LinkedList<PearlPearlPearl>(allPearls.values());
   }
 
   public static void verifyAllPearls(){
-    new LinkedList<PearlPearlPearl>(allPearls.values()).forEach(PearlPearlPearl::aggroVerify);
+    getAllPearlsSnapshot().forEach(PearlPearlPearl::aggroVerify);
+  }
+
+  public void takePearlCostFrom(PearlPearlPearl other){
+    if(other.uniqueId.equals(uniqueId)){
+      return;
+    }
+    double distance = other.aggroVerify()
+      .flatMap(o -> aggroVerify().map(o::distance))
+      .orElse(0.0);
+    PearlPearlConfig c = PearlPearl.getConfiguration();
+    long damageTaken = (long) (c.pearlDecayScale * Math.pow(c.pearlDecayBase,distance/c.pearlDecayRange));
+    damage += damageTaken;
+    System.out.println(uniqueId + " is taking " + damageTaken + " from " + other.uniqueId);
+    Bukkit.getScheduler().runTaskAsynchronously(PearlPearl.getInstance(), () -> dao.updateDamage(this));
+  }
+
+  public void takeDamage(long dmg){
+    damage += dmg;
+  }
+
+  public static Optional<PearlPearlPearl> getPearlByUUID(UUID u){
+    return Optional.ofNullable(allPearls.get(u));
+  }
+
+  public boolean exhibitsBehavior(PearlPearlBehavior b){
+    return behaviors.contains(b);
+  }
+
+  public void setBehavior(PearlPearlBehavior b, boolean enable){
+    if(enable){
+      behaviors.add(b);
+    }else{
+      behaviors.remove(b);
+    }
+  }
+
+  public static void pearlDecay(){
+    LinkedList<PearlPearlPearl> allPearls = getAllPearlsSnapshot();
+    allPearls.forEach(p -> {
+      PearlPearlConfig c = PearlPearl.getConfiguration();
+      // Take extra damage for enabled behaviors
+      p.behaviors.forEach(b -> p.takeDamage(Optional.ofNullable(c.behaviorCosts.get(b)).map(Integer::longValue).orElse(0L)));
+      // Take one damage first
+      p.takeDamage(1L);
+      // Take extra damage for nearby pearls
+      allPearls.forEach(p::takePearlCostFrom);
+    });
+  }
+
+  public static Set<PearlPearlPearl> pearlsWithBehavior(PearlPearlBehavior b){
+    return allPearls.values().stream().filter(p -> p.exhibitsBehavior(b)).collect(Collectors.toSet());
   }
 }

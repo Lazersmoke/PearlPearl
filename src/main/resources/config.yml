@@ -8,3 +8,8 @@ mysql:
   connectionTimeout: 10000
   idleTimout: 600000
   maxLifetime: 7200000
+
+enabledBehaviors:
+  EXILE: 10
+  END: 5
+  BASTION_BANISH: 1

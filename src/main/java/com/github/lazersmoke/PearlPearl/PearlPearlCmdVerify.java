@@ -21,7 +21,7 @@ public class PearlPearlCmdVerify extends PlayerCommand {
       return true;
     }
     Player p = (Player) sender;
-    new PearlPearlPearlListGUI(p.getUniqueId(), PearlPearlPearl.getAllPearls()).showScreen();
+    new PearlPearlPearlListGUI(p.getUniqueId(), PearlPearlPearl.getAllPearlsSnapshot()).showScreen();
     return true;
   }
 

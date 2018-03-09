@@ -1,8 +1,6 @@
 package com.github.lazersmoke.PearlPearl;
 
-import java.util.LinkedList;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
@@ -33,10 +31,10 @@ import vg.civcraft.mc.civmodcore.itemHandling.ItemMap;
 
 public class PearlPearlPearlListGUI{
   private final UUID uuid;
-  private final Map<UUID,PearlPearlPearl> allPearls;
+  private final List<PearlPearlPearl> allPearls;
   private int currentPage;
 
-  public PearlPearlPearlListGUI(UUID uuid, Map<UUID,PearlPearlPearl> allPearls){
+  public PearlPearlPearlListGUI(UUID uuid, List<PearlPearlPearl> allPearls){
     this.uuid = uuid;
     this.allPearls = allPearls;
     this.currentPage = 0;
@@ -49,7 +47,7 @@ public class PearlPearlPearlListGUI{
     }
     ClickableInventory.forceCloseInventory(p);
     ClickableInventory ci = new ClickableInventory(54, "Pearl Pearls");
-    Set<PearlPearlPearl> pearls = allPearls.entrySet().stream().map(Map.Entry::getValue).filter(pe -> pe.pearledId.equals(uuid)).collect(Collectors.toSet());
+    Set<PearlPearlPearl> pearls = allPearls.stream().filter(pe -> pe.pearledId.equals(uuid)).collect(Collectors.toSet());
     if (pearls.size() < 45 * currentPage) {
       // would show an empty page, so go to previous
       currentPage--;

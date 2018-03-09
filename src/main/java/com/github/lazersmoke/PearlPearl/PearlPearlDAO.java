@@ -16,7 +16,9 @@ import vg.civcraft.mc.civmodcore.dao.ManagedDatasource;
 
 public class PearlPearlDAO {
 
-  private static final String ADD_PEARL = "insert into pearlPearlPearls (pearlIdMost,pearlIdLeast,pearledIdMost,pearledIdLeast,pearlerIdMost,pearlerIdLeast,timePearled,pearlHolderType,pearlHolder) values (?,?,?,?,?,?,?,?,?);";
+  private static final String ADD_PEARL = "insert into pearlPearlPearls (pearlIdMost,pearlIdLeast,pearledIdMost,pearledIdLeast,pearlerIdMost,pearlerIdLeast,timePearled,pearlHolderType,pearlHolder,pearlDamage) values (?,?,?,?,?,?,?,?,?,?);";
+  private static final String UPDATE_HOLDER = "update pearlPearlPearls set pearlHolderType=?, pearlHolder=? where pearlIdMost=? and pearlIdLeast=?;";
+  private static final String UPDATE_DAMAGE = "update pearlPearlPearls set pearlDamage=? where pearlIdMost=? and pearlIdLeast=?;";
   private static final String SNIPE_PEARL = "delete from pearlPearlPearls where pearlIdMost=? and pearlIdLeast=?;";
   private static final String ALL_PEARLS = "select * from pearlPearlPearls;";
   private final ManagedDatasource db;
@@ -49,6 +51,7 @@ public class PearlPearlDAO {
         + "timePearled timestamp not null,"
         + "pearlHolderType int not null,"
         + "pearlHolder varbinary(128) not null,"
+        + "pearlDamage bigint not null,"
         + "primary key(pearlIdMost,pearlIdLeast));");
   }
 
@@ -78,8 +81,32 @@ public class PearlPearlDAO {
       writeUUID(ps,3,pearl.pearledId);
       writeUUID(ps,5,pearl.pearlerId);
       ps.setTimestamp(7, Timestamp.from(pearl.timePearled));
-      ps.setInt(8, pearl.getHolder().type.magic);
+      ps.setInt(8, pearl.getHolder().type.ordinal());
       ps.setBytes(9, pearl.getHolder().serialize());
+      ps.setLong(10, pearl.getDamage());
+      ps.execute();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public void updateHolder(PearlPearlPearl pearl){
+    try (Connection conn = db.getConnection();
+        PreparedStatement ps = conn.prepareStatement(UPDATE_HOLDER)) {
+      ps.setInt(1, pearl.getHolder().type.ordinal());
+      ps.setBytes(2, pearl.getHolder().serialize());
+      writeUUID(ps,3,pearl.uniqueId);
+      ps.execute();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public void updateDamage(PearlPearlPearl pearl){
+    try (Connection conn = db.getConnection();
+        PreparedStatement ps = conn.prepareStatement(UPDATE_DAMAGE)) {
+      ps.setLong(1, pearl.getDamage());
+      writeUUID(ps,2,pearl.uniqueId);
       ps.execute();
     } catch (SQLException e) {
       e.printStackTrace();
@@ -101,7 +128,7 @@ public class PearlPearlDAO {
         PreparedStatement ps = conn.prepareStatement(ALL_PEARLS)) {
       ResultSet rs = ps.executeQuery();
       while(rs.next()){
-        pearl.put(readUUID(rs,1),new PearlPearlPearl(readUUID(rs,1),readUUID(rs,3),readUUID(rs,5),rs.getTimestamp(7).toInstant(), PearlPearlPearl.deserializePearlHolder(rs.getInt(8),rs.getBytes(9))));
+        pearl.put(readUUID(rs,1),new PearlPearlPearl(readUUID(rs,1),readUUID(rs,3),readUUID(rs,5),rs.getTimestamp(7).toInstant(), PearlPearlHolder.deserializePearlHolder(rs.getInt(8),rs.getBytes(9)),rs.getLong(10)));
       }
     } catch (SQLException e) {
       e.printStackTrace();

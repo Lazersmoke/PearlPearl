@@ -17,8 +17,12 @@ import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.EntityPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkUnloadEvent;
+import org.bukkit.event.inventory.InventoryInteractEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.inventory.InventoryPickupItemEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.Inventory;
@@ -95,8 +99,8 @@ public final class PearlPearlListener implements Listener{
   @EventHandler(ignoreCancelled=true)
   public void onSpawnPearlItem(ItemSpawnEvent e){
     Item i = e.getEntity();
-    PearlPearlPearl.fromItemStack(i.getItemStack()).ifPresent(pearl -> {
-      pearl.setHolder(new PearlPearlPearl.PearlHolder.Dropped(i.getUniqueId()));
+    PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).ifPresent(pearl -> {
+      pearl.setHolder(new PearlPearlHolder.Dropped(i.getUniqueId()));
       i.setItemStack(pearl.getItemRepr());
     });
   }
@@ -108,20 +112,21 @@ public final class PearlPearlListener implements Listener{
     }
     Player p = (Player) e.getEntity();
     Item i = e.getItem();
-    PearlPearlPearl.fromItemStack(i.getItemStack()).ifPresent(pearl -> {
-      pearl.setHolder(new PearlPearlPearl.PearlHolder.Player(p.getUniqueId()));
+    PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).ifPresent(pearl -> {
+      pearl.setHolder(new PearlPearlHolder.Player(p.getUniqueId()));
       i.setItemStack(pearl.getItemRepr());
     });
   }
 
   @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onPearlDespawn(ItemDespawnEvent e){
-    e.setCancelled(PearlPearlPearl.fromItemStack(e.getEntity().getItemStack()).isPresent());
+    Item i = e.getEntity();
+    e.setCancelled(PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).isPresent());
   }
 
   @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onChunkUnload(ChunkUnloadEvent e) {
-    e.setCancelled(Arrays.stream(e.getChunk().getEntities()).anyMatch(i -> i instanceof Item && PearlPearlPearl.fromItemStack(((Item) i).getItemStack()).isPresent()));
+    e.setCancelled(Arrays.stream(e.getChunk().getEntities()).anyMatch(i -> i instanceof Item && PearlPearlPearl.updateItemStack(((Item) i).getItemStack(),s -> ((Item) i).setItemStack(s)).isPresent()));
     
   }
 
@@ -137,7 +142,7 @@ public final class PearlPearlListener implements Listener{
     Inventory inv = p.getInventory();
     IntStream.range(0,inv.getSize())
       // On all the pearls
-      .filter(i -> PearlPearlPearl.fromItemStack(inv.getItem(i)).isPresent())
+      .filter(i -> PearlPearlPearl.updateItemStack(inv.getItem(i),s -> inv.setItem(i,s)).isPresent())
       .forEach(i -> {
         // Drop in world
         p.getWorld().dropItemNaturally(p.getLocation(), inv.getItem(i));
@@ -147,53 +152,53 @@ public final class PearlPearlListener implements Listener{
     p.saveData();
   }
 
-  @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+  @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onDragPearl(InventoryDragEvent e){
     e.getNewItems().keySet().stream().forEach(i -> PearlPearlPearl.fromItemStack(e.getNewItems().get(i)).ifPresent(pearl -> {
-      InventoryHolder holder = e.getView().convertSlot(i) == i ? e.getView().getTopInventory().getHolder() : e.getView().getBottomInventory().getHolder();
-      Optional<PearlPearlPearl.PearlHolder> pholder = PearlPearlPearl.PearlHolder.fromInventory(holder);
-      if(pholder.isPresent()){
-        pearl.setHolder(pholder.get());
-      }else{
-        Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(p -> p.sendMessage(ChatColor.RED + "Your pearl was placed in an inventory, but that inventory wasn't a valid PearlHolder :V"));
-      }
+      Inventory destinationInv = i < e.getView().getTopInventory().getSize() ? e.getView().getTopInventory() : e.getView().getBottomInventory();
+      ifPresentOrElse(Optional.ofNullable(destinationInv.getHolder()).flatMap(PearlPearlHolder::fromInventory),pearl::setHolder,() -> denyClick(e));
     }));
   }
 
   @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
   public void onClickPearl(InventoryClickEvent e){
+    Player clicker = (Player) e.getWhoClicked();
+    PearlPearlHolder clickerHolder = new PearlPearlHolder.Player(clicker.getUniqueId());
+    final Optional<PearlPearlHolder> otherHolder = Optional.ofNullable(e.getClickedInventory()).map(Inventory::getHolder).flatMap(PearlPearlHolder::fromInventory);
+    final Optional<PearlPearlPearl> currentPearl = PearlPearlPearl.updateItemStack(e.getCurrentItem(),e::setCurrentItem);
+    final Optional<PearlPearlPearl> cursorPearl = PearlPearlPearl.fromItemStack(e.getCursor());
+    final Inventory clickerInv = clicker.getInventory();
+    Optional<PearlPearlPearl> hotbarPearl = Optional.empty();
+    if(e.getAction() == InventoryAction.HOTBAR_SWAP || e.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD){
+      hotbarPearl = PearlPearlPearl.updateItemStack(clickerInv.getItem(e.getHotbarButton()),s -> clickerInv.setItem(e.getHotbarButton(),s));
+    }
     // Did we click a non-player inventory?
     boolean clickedOther = e.getRawSlot() < e.getView().getTopInventory().getSize();
-    Player clicker = (Player) e.getWhoClicked();
-    PearlPearlPearl.PearlHolder clickerHolder = new PearlPearlPearl.PearlHolder.Player(clicker.getUniqueId());
-    Optional<PearlPearlPearl.PearlHolder> otherHolder = Optional.ofNullable(e.getClickedInventory().getHolder()).flatMap(PearlPearlPearl.PearlHolder::fromInventory);
-    Optional<PearlPearlPearl> clickedPearl = PearlPearlPearl.fromItemStack(e.getCurrentItem());
-    Optional<PearlPearlPearl> cursorPearl = PearlPearlPearl.fromItemStack(e.getCursor());
+    if(!clickedOther && e.getAction() != InventoryAction.MOVE_TO_OTHER_INVENTORY){
+      return;
+    }
+    // Don't allow pearls in invalid slots
     switch(e.getAction()){
       // Inventory -> Cursor
       case COLLECT_TO_CURSOR:
       case PICKUP_ALL:
       case PICKUP_HALF:
       case PICKUP_ONE:
-        if(clickedOther){
-          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
-        }
+        currentPearl.ifPresent(p -> p.setHolder(clickerHolder));
         break;
       // Cursor -> Inventory
       case PLACE_ALL:
       case PLACE_SOME:
       case PLACE_ONE:
-        if(clickedOther){
-          cursorPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
-        }
+        cursorPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
         break;
       // Shift click
       case MOVE_TO_OTHER_INVENTORY:
-        clickedPearl.ifPresent(pearl -> {
+        currentPearl.ifPresent(pearl -> {
           // The inventory the pearl will move to
           Inventory destinationInv = clickedOther ? e.getView().getBottomInventory() : e.getView().getTopInventory();
-          ifPresentOrElse(Optional.ofNullable(destinationInv.getHolder()).flatMap(PearlPearlPearl.PearlHolder::fromInventory),pholder -> {
-            // If the PearlHolder is legitimate, use our own handling
+          ifPresentOrElse(Optional.ofNullable(destinationInv.getHolder()).flatMap(PearlPearlHolder::fromInventory),pholder -> {
+            // If the PearlPearlHolder is legitimate, use our own handling
             e.setCancelled(true);
             // If we successfully transferred the pearl
             if(destinationInv.addItem(pearl.getItemRepr()).isEmpty()){
@@ -206,16 +211,12 @@ public final class PearlPearlListener implements Listener{
         break;
       case HOTBAR_SWAP:
       case HOTBAR_MOVE_AND_READD:
-        if(clickedOther){
-          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
-          PearlPearlPearl.fromItemStack(clicker.getInventory().getItem(e.getHotbarButton())).ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
-        }
+        currentPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
+        hotbarPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
         break;
       case SWAP_WITH_CURSOR:
-        if(clickedOther){
-          clickedPearl.ifPresent(pearl -> pearl.setHolder(clickerHolder));
-          cursorPearl.ifPresent(pearl -> ifPresentOrElse(otherHolder,pearl::setHolder,() -> denyClick(e)));
-        }
+        currentPearl.ifPresent(p -> p.setHolder(clickerHolder));
+        cursorPearl.ifPresent(p -> ifPresentOrElse(otherHolder,p::setHolder,() -> denyClick(e)));
         break;
       case DROP_ALL_CURSOR:
       case DROP_ONE_CURSOR:
@@ -229,13 +230,13 @@ public final class PearlPearlListener implements Listener{
       case CLONE_STACK:
       case UNKNOWN:
       default:
-        if(clickedPearl.isPresent() || cursorPearl.isPresent()){
+        if(currentPearl.isPresent()){
           denyClick(e);
         }
     }
   }
 
-  private <T> void ifPresentOrElse(Optional<T> o, Consumer<T> f, Runnable def){
+  public static <T> void ifPresentOrElse(Optional<T> o, Consumer<T> f, Runnable def){
     if(o.isPresent()){
       f.accept(o.get());
     }else{
@@ -243,7 +244,7 @@ public final class PearlPearlListener implements Listener{
     }
   }
 
-  private void denyClick(InventoryClickEvent e){
+  private void denyClick(InventoryInteractEvent e){
     e.getWhoClicked().sendMessage(ChatColor.RED + "You can't do that with a pearl, you monster!");
     e.setCancelled(true);
   }
@@ -255,7 +256,7 @@ public final class PearlPearlListener implements Listener{
       return;
     }
     Item i = (Item) e.getEntity();
-    PearlPearlPearl.fromItemStack(i.getItemStack()).ifPresent(pearl -> {
+    PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).ifPresent(pearl -> {
       if(e.getCause() == EntityDamageEvent.DamageCause.VOID){
         pearl.freePearl("your pearl fell in the void");
       }else{
@@ -283,6 +284,21 @@ public final class PearlPearlListener implements Listener{
 
   @EventHandler(ignoreCancelled=true)
   public void onPearlPortal(EntityPortalEvent e) {
-    e.setCancelled(e.getEntity() instanceof Item && PearlPearlPearl.fromItemStack(((Item) e.getEntity()).getItemStack()).isPresent());
+    e.setCancelled(e.getEntity() instanceof Item && PearlPearlPearl.updateItemStack(((Item) e.getEntity()).getItemStack(),s -> ((Item) e.getEntity()).setItemStack(s)).isPresent());
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onHopperSuckPearl(InventoryPickupItemEvent e) {
+    Item i = e.getItem();
+    PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).ifPresent(pearl -> {
+      ifPresentOrElse(Optional.ofNullable(e.getInventory().getHolder()).flatMap(PearlPearlHolder::fromInventory),pearl::setHolder,() -> e.setCancelled(true));
+    });
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onHopperMovePearl(InventoryMoveItemEvent e) {
+    PearlPearlPearl.fromItemStack(e.getItem()).ifPresent(pearl -> {
+      ifPresentOrElse(Optional.ofNullable(e.getDestination().getHolder()).flatMap(PearlPearlHolder::fromInventory),pearl::setHolder,() -> e.setCancelled(true));
+    });
   }
 }
