@@ -14,7 +14,7 @@ import vg.civcraft.mc.civmodcore.itemHandling.ISUtils;
 
 public enum PearlPearlBehavior{
   EXILE("Exile", new ItemStack(Material.POTION, 1, (short) 12), new String[]{"Prevents the pearled player from", "being within " + PearlPearl.getInstance().getConfiguration().exileRadius + " blocks of their pearl"}),
-  END("Prison", new ItemStack(Material.ENDER_STONE), new String[]{"Banishes the pearled player to the End"}),
+  PRISON("Prison", new ItemStack(Material.ENDER_STONE), new String[]{"Banishes the pearled player to the End"}),
   BASTION("Bastion Banish", new ItemStack(Material.SPONGE), new String[]{"Prevents the pearled player from", "entering hostile bastion fields", "within " + PearlPearl.getInstance().getConfiguration().exileRadius + " blocks of their pearl"});
   
   public final String name;
@@ -38,7 +38,7 @@ public enum PearlPearlBehavior{
     PearlPearlPearl.pearlsWithBehavior(EXILE).forEach(pearl -> {
       Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(player -> {
         pearl.aggroVerify().ifPresent(pearlLocation -> {
-          if(pearlLocation.distance(player.getLocation()) < PearlPearl.getInstance().getConfiguration().exileRadius){
+          if(pearlLocation.getWorld().equals(player.getLocation().getWorld()) && pearlLocation.distance(player.getLocation()) < PearlPearl.getInstance().getConfiguration().exileRadius){
             player.getWorld().playSound(player.getLocation(),Sound.ENTITY_POLAR_BEAR_DEATH,1.0f,1.5f + new Random().nextFloat() * 0.5f);
             player.getWorld().playSound(player.getLocation(),Sound.ENTITY_GENERIC_EXPLODE,0.5f,0.5f);
             player.damage(2);
@@ -56,7 +56,7 @@ public enum PearlPearlBehavior{
       }
       Optional.ofNullable(Bukkit.getPlayer(pearl.pearledId)).ifPresent(player -> {
         pearl.aggroVerify().ifPresent(pearlLocation -> {
-          if(pearlLocation.distance(player.getLocation()) < PearlPearl.getInstance().getConfiguration().exileRadius){
+          if(pearlLocation.getWorld().equals(player.getLocation().getWorld()) && pearlLocation.distance(player.getLocation()) < PearlPearl.getInstance().getConfiguration().exileRadius){
             for(Location l : PearlPearl.getInstance().getBlockingBastions(player)){
               player.getWorld().playSound(l,Sound.ENTITY_EVOCATION_ILLAGER_CAST_SPELL,64.0f,2.0f);
               player.getWorld().playSound(player.getLocation(),Sound.ENTITY_POLAR_BEAR_DEATH,1.0f,1.5f + new Random().nextFloat() * 0.5f);

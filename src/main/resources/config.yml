@@ -10,6 +10,12 @@ mysql:
   maxLifetime: 7200000
 
 enabledBehaviors:
-  EXILE: 10
-  END: 5
-  BASTION_BANISH: 1
+  EXILE:
+    cost: 10
+    upgradeCost: 10
+  PRISON:
+    cost: 5
+    upgradeCost: 5
+  BASTION:
+    cost: 1
+    upgradeCost: 1

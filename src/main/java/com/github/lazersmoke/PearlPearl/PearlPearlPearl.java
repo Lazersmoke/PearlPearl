@@ -38,13 +38,18 @@ public final class PearlPearlPearl{
   private PearlPearlHolder holder;
   private long damage;
 
-  public PearlPearlPearl(UUID uniqueId, UUID pearledId, UUID pearlerId, Instant timePearled, PearlPearlHolder holder, long damage){
+  public PearlPearlPearl(UUID uniqueId, UUID pearledId, UUID pearlerId, Instant timePearled, PearlPearlHolder holder, long damage, int behavior){
     this.uniqueId = uniqueId;
     this.pearledId = pearledId;
     this.pearlerId = pearlerId;
     this.timePearled = timePearled;
     this.holder = holder;
     this.damage = damage;
+    for(int i = 0; i < PearlPearlBehavior.values().length; i++){
+      if(((1 << i) & behavior) != 0){
+        behaviors.add(PearlPearlBehavior.values()[i]);
+      }
+    }
   }
 
   public static PearlPearlPearl makePearlingHappen(UUID pearled, Player pearler){
@@ -52,7 +57,7 @@ public final class PearlPearlPearl{
     String pearlerName = NameAPI.getCurrentName(pearler.getUniqueId());
     pearler.sendMessage(ChatColor.GREEN + "You pearled " + ChatColor.AQUA + pearledName);
     Optional.ofNullable(Bukkit.getPlayer(pearled)).ifPresent(p -> p.sendMessage(ChatColor.GOLD + "You got pearled by " + ChatColor.AQUA + pearlerName));
-    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlPearlHolder.Player(pearler.getUniqueId()), 0);
+    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlPearlHolder.Player(pearler.getUniqueId()), 0, 0);
     allPearls.put(pearl.uniqueId,pearl);
     dao.addNewPearl(pearl);
     ItemStack pearlItem = pearl.getItemRepr();
@@ -100,7 +105,7 @@ public final class PearlPearlPearl{
       return Optional.empty();
     }
     try{
-      return Optional.of(UUID.fromString(i.getItemMeta().getLore().get(4).substring(pearlIdPrefix.length())));
+      return Optional.of(UUID.fromString(i.getItemMeta().getLore().get(i.getItemMeta().getLore().size() - 1).substring(pearlIdPrefix.length())));
     } catch(Exception e){}
     // Doesn't look like a pearl
     return Optional.empty();
@@ -124,6 +129,18 @@ public final class PearlPearlPearl{
     lines.add(ChatColor.RESET + "Time pearled: " + ChatColor.DARK_GREEN + ChatColor.ITALIC + timePearled.toString());
     lines.add(ChatColor.RESET + "Pearled by: " + ChatColor.AQUA + NameAPI.getCurrentName(pearlerId));
     lines.add(ChatColor.RESET + "Damage: " + ChatColor.GOLD + damage);
+    String bs = "";
+    for(PearlPearlBehavior b : getBehaviors()){
+      if(bs.equals("")){
+        bs += b.name;
+      }else{
+        bs += ", " + b.name;
+      }
+    }
+    if(bs.equals("")){
+      bs = "None";
+    }
+    lines.add(ChatColor.RESET + "Behaviors: " + ChatColor.GOLD + bs);
     lines.add(pearlIdPrefix + uniqueId.toString());
     return lines;
   }
@@ -164,7 +181,7 @@ public final class PearlPearlPearl{
       return;
     }
     double distance = other.aggroVerify()
-      .flatMap(o -> aggroVerify().map(o::distance))
+      .flatMap(o -> aggroVerify().filter(a -> a.getWorld().equals(o.getWorld())).map(o::distance))
       .orElse(0.0);
     PearlPearlConfig c = PearlPearl.getConfiguration();
     long damageTaken = (long) (c.pearlDecayScale * Math.pow(c.pearlDecayBase,distance/c.pearlDecayRange));
@@ -181,8 +198,18 @@ public final class PearlPearlPearl{
     return Optional.ofNullable(allPearls.get(u));
   }
 
+  public int encodeBehavior(){
+    int b = 0;
+    for(int i = 0; i < PearlPearlBehavior.values().length; i++){
+        if(exhibitsBehavior(PearlPearlBehavior.values()[i])){
+          b |= (1 << i);
+        }
+      }
+    return b;
+  }
+
   public boolean exhibitsBehavior(PearlPearlBehavior b){
-    return behaviors.contains(b);
+    return PearlPearl.getInstance().getConfiguration().enabledBehaviors.contains(b) && behaviors.contains(b);
   }
 
   public void setBehavior(PearlPearlBehavior b, boolean enable){
@@ -191,6 +218,7 @@ public final class PearlPearlPearl{
     }else{
       behaviors.remove(b);
     }
+    Bukkit.getScheduler().runTaskAsynchronously(PearlPearl.getInstance(), () -> dao.updateBehavior(this));
   }
 
   public static void pearlDecay(){
@@ -198,12 +226,16 @@ public final class PearlPearlPearl{
     allPearls.forEach(p -> {
       PearlPearlConfig c = PearlPearl.getConfiguration();
       // Take extra damage for enabled behaviors
-      p.behaviors.forEach(b -> p.takeDamage(Optional.ofNullable(c.behaviorCosts.get(b)).map(Integer::longValue).orElse(0L)));
+      p.getBehaviors().forEach(b -> p.takeDamage(Optional.ofNullable(c.behaviorCosts.get(b)).map(Integer::longValue).orElse(0L)));
       // Take one damage first
       p.takeDamage(1L);
       // Take extra damage for nearby pearls
       allPearls.forEach(p::takePearlCostFrom);
     });
+  }
+
+  public Set<PearlPearlBehavior> getBehaviors(){
+    return behaviors.stream().filter(b -> PearlPearl.getConfiguration().enabledBehaviors.contains(b)).collect(Collectors.toSet());
   }
 
   public static Set<PearlPearlPearl> pearlsWithBehavior(PearlPearlBehavior b){

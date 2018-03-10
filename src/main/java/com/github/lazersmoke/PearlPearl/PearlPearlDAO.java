@@ -16,9 +16,10 @@ import vg.civcraft.mc.civmodcore.dao.ManagedDatasource;
 
 public class PearlPearlDAO {
 
-  private static final String ADD_PEARL = "insert into pearlPearlPearls (pearlIdMost,pearlIdLeast,pearledIdMost,pearledIdLeast,pearlerIdMost,pearlerIdLeast,timePearled,pearlHolderType,pearlHolder,pearlDamage) values (?,?,?,?,?,?,?,?,?,?);";
+  private static final String ADD_PEARL = "insert into pearlPearlPearls (pearlIdMost,pearlIdLeast,pearledIdMost,pearledIdLeast,pearlerIdMost,pearlerIdLeast,timePearled,pearlHolderType,pearlHolder,pearlDamage,pearlBehavior) values (?,?,?,?,?,?,?,?,?,?,?);";
   private static final String UPDATE_HOLDER = "update pearlPearlPearls set pearlHolderType=?, pearlHolder=? where pearlIdMost=? and pearlIdLeast=?;";
   private static final String UPDATE_DAMAGE = "update pearlPearlPearls set pearlDamage=? where pearlIdMost=? and pearlIdLeast=?;";
+  private static final String UPDATE_BEHAVIOR = "update pearlPearlPearls set pearlBehavior=? where pearlIdMost=? and pearlIdLeast=?;";
   private static final String SNIPE_PEARL = "delete from pearlPearlPearls where pearlIdMost=? and pearlIdLeast=?;";
   private static final String ALL_PEARLS = "select * from pearlPearlPearls;";
   private final ManagedDatasource db;
@@ -52,6 +53,7 @@ public class PearlPearlDAO {
         + "pearlHolderType int not null,"
         + "pearlHolder varbinary(128) not null,"
         + "pearlDamage bigint not null,"
+        + "pearlBehavior int not null,"
         + "primary key(pearlIdMost,pearlIdLeast));");
   }
 
@@ -84,6 +86,7 @@ public class PearlPearlDAO {
       ps.setInt(8, pearl.getHolder().type.ordinal());
       ps.setBytes(9, pearl.getHolder().serialize());
       ps.setLong(10, pearl.getDamage());
+      ps.setInt(11, pearl.encodeBehavior());
       ps.execute();
     } catch (SQLException e) {
       e.printStackTrace();
@@ -113,6 +116,17 @@ public class PearlPearlDAO {
     }
   }
 
+  public void updateBehavior(PearlPearlPearl pearl){
+    try (Connection conn = db.getConnection();
+        PreparedStatement ps = conn.prepareStatement(UPDATE_BEHAVIOR)) {
+      ps.setInt(1, pearl.encodeBehavior());
+      writeUUID(ps,2,pearl.uniqueId);
+      ps.execute();
+    } catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
   public void snipePearl(UUID u){
     try (Connection conn = db.getConnection();
         PreparedStatement ps = conn.prepareStatement(SNIPE_PEARL)) {
@@ -128,7 +142,7 @@ public class PearlPearlDAO {
         PreparedStatement ps = conn.prepareStatement(ALL_PEARLS)) {
       ResultSet rs = ps.executeQuery();
       while(rs.next()){
-        pearl.put(readUUID(rs,1),new PearlPearlPearl(readUUID(rs,1),readUUID(rs,3),readUUID(rs,5),rs.getTimestamp(7).toInstant(), PearlPearlHolder.deserializePearlHolder(rs.getInt(8),rs.getBytes(9)),rs.getLong(10)));
+        pearl.put(readUUID(rs,1),new PearlPearlPearl(readUUID(rs,1),readUUID(rs,3),readUUID(rs,5),rs.getTimestamp(7).toInstant(), PearlPearlHolder.deserializePearlHolder(rs.getInt(8),rs.getBytes(9)),rs.getLong(10),rs.getInt(11)));
       }
     } catch (SQLException e) {
       e.printStackTrace();

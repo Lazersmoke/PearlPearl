@@ -1,6 +1,7 @@
 package com.github.lazersmoke.PearlPearl;
 
 import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.EnderPearl;
@@ -16,6 +17,10 @@ import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.EntityPortalEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerPortalEvent;
+import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.bukkit.event.world.ChunkUnloadEvent;
 import org.bukkit.event.inventory.InventoryInteractEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -300,5 +305,33 @@ public final class PearlPearlListener implements Listener{
     PearlPearlPearl.fromItemStack(e.getItem()).ifPresent(pearl -> {
       ifPresentOrElse(Optional.ofNullable(e.getDestination().getHolder()).flatMap(PearlPearlHolder::fromInventory),pearl::setHolder,() -> e.setCancelled(true));
     });
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onPlayerJoin(PlayerJoinEvent e){
+    Player p = e.getPlayer();
+    if(isPrisonPearled(p.getUniqueId()) && !p.getWorld().equals(PearlPearl.getConfiguration().prisonWorld)){
+      p.teleport(PearlPearl.getConfiguration().prisonWorld.getSpawnLocation().add(0,0.5,0));
+    }
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onPlayerRespawn(PlayerRespawnEvent e){
+    Player p = e.getPlayer();
+    if(isPrisonPearled(p.getUniqueId())){
+      e.setRespawnLocation(PearlPearl.getConfiguration().prisonWorld.getSpawnLocation().add(0,0.5,0));
+    }
+  }
+
+  @EventHandler(ignoreCancelled=true)
+  public void onEscapeEndViaPortal(PlayerPortalEvent e){
+    Player p = e.getPlayer();
+    if(e.getCause() == TeleportCause.END_PORTAL && isPrisonPearled(p.getUniqueId())){
+      e.setTo(PearlPearl.getConfiguration().prisonWorld.getSpawnLocation().add(0,0.5,0));
+    }
+  }
+
+  private boolean isPrisonPearled(UUID u){
+    return PearlPearlPearl.getPearlsForUUID(u).stream().anyMatch(pe -> pe.exhibitsBehavior(PearlPearlBehavior.PRISON));
   }
 }
