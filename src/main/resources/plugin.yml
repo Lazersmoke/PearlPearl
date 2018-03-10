@@ -5,20 +5,32 @@ version: ${project.version}
 depend: [CivModCore, NameLayer]
 softdepend: [CombatTagPlus, Bastion]
 commands:
-    ppunleash:
-        permission: pearlpearl.public
-    ppverify:
-        permission: pearlpearl.public
-    ppbehave:
-        permission: pearlpearl.public
-    ppcheck:
-        permission: pearlpearl.admin
-    ppaggro:
-        permission: pearlpearl.admin
-    ppsmite:
-        permission: pearlpearl.admin
+  ppaggro:
+    aliases: [ppa]
+    permission: pearlpearl.admin
+  ppbehave:
+    aliases: [ppb]
+    permission: pearlpearl.public
+  ppcheck:
+    aliases: [ppc]
+    permission: pearlpearl.admin
+  ppoverview:
+    aliases: [ppo]
+    permission: pearlpearl.admin
+  ppsmite:
+    aliases: [pps]
+    permission: pearlpearl.admin
+  ppverify:
+    aliases: [ppv]
+    permission: pearlpearl.public
+  ppunleash:
+    aliases: [ppu]
+    permission: pearlpearl.public
+  ppzap:
+    aliases: [ppz]
+    permission: pearlpearl.admin
 permissions:
-    pearlpearl.public:
-        default: true
-    pearlpearl.admin:
-        default: op
+  pearlpearl.public:
+    default: true
+  pearlpearl.admin:
+    default: op

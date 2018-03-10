@@ -8,8 +8,10 @@ public class PearlPearlCmdHandler extends CommandHandler{
     addCommands(new PearlPearlCmdAggro("Aggro"));
     addCommands(new PearlPearlCmdBehave("Behave"));
     addCommands(new PearlPearlCmdCheck("Check"));
+    addCommands(new PearlPearlCmdOverview("Overview"));
     addCommands(new PearlPearlCmdSmite("Smite"));
     addCommands(new PearlPearlCmdUnleash("Unleash"));
     addCommands(new PearlPearlCmdVerify("Verify"));
+    addCommands(new PearlPearlCmdZap("Zap"));
   }
 }

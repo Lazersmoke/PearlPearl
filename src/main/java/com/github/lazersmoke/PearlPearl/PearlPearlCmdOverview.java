@@ -7,12 +7,12 @@ import org.bukkit.command.CommandSender;
 import java.util.List;
 import java.util.LinkedList;
 
-public class PearlPearlCmdVerify extends PlayerCommand {
-  public PearlPearlCmdVerify(String name) {
+public class PearlPearlCmdOverview extends PlayerCommand {
+  public PearlPearlCmdOverview(String name) {
     super(name);
-    setIdentifier("ppverify");
-    setDescription("Verify that your pearl is legitimately held");
-    setUsage("/ppverify");
+    setIdentifier("ppoverview");
+    setDescription("Overview all the pearls in existence");
+    setUsage("/ppoverview");
     setArguments(0,0);
   }
 
@@ -21,7 +21,7 @@ public class PearlPearlCmdVerify extends PlayerCommand {
       return true;
     }
     Player p = (Player) sender;
-    new PearlPearlPearlListGUI(p.getUniqueId(), PearlPearlPearl.getAllPearlsSnapshot(),pe -> pe.pearledId.equals(p.getUniqueId())).showScreen();
+    new PearlPearlPearlListGUI(p.getUniqueId(), PearlPearlPearl.getAllPearlsSnapshot(), pe -> true).showScreen();
     return true;
   }
 

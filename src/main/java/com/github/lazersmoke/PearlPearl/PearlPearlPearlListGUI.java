@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.util.TimeZone;
 import java.time.Duration;
 import java.util.stream.Collectors;
+import java.util.function.Predicate;
 import org.bukkit.entity.Player;
 import org.bukkit.Bukkit;
 import org.bukkit.inventory.ItemStack;
@@ -32,11 +33,13 @@ import vg.civcraft.mc.civmodcore.itemHandling.ItemMap;
 public class PearlPearlPearlListGUI{
   private final UUID uuid;
   private final List<PearlPearlPearl> allPearls;
+  private final Predicate<PearlPearlPearl> whichPearls;
   private int currentPage;
 
-  public PearlPearlPearlListGUI(UUID uuid, List<PearlPearlPearl> allPearls){
+  public PearlPearlPearlListGUI(UUID uuid, List<PearlPearlPearl> allPearls, Predicate<PearlPearlPearl> whichPearls){
     this.uuid = uuid;
     this.allPearls = allPearls;
+    this.whichPearls = whichPearls;
     this.currentPage = 0;
   }
 
@@ -47,7 +50,7 @@ public class PearlPearlPearlListGUI{
     }
     ClickableInventory.forceCloseInventory(p);
     ClickableInventory ci = new ClickableInventory(54, "Pearl Pearls");
-    Set<PearlPearlPearl> pearls = allPearls.stream().filter(pe -> pe.pearledId.equals(uuid)).collect(Collectors.toSet());
+    Set<PearlPearlPearl> pearls = allPearls.stream().filter(whichPearls).collect(Collectors.toSet());
     if (pearls.size() < 45 * currentPage) {
       // would show an empty page, so go to previous
       currentPage--;

@@ -117,7 +117,7 @@ public final class PearlPearlListener implements Listener{
     }
     Player p = (Player) e.getEntity();
     Item i = e.getItem();
-    PearlPearlPearl.updateItemStack(i.getItemStack(),i::setItemStack).ifPresent(pearl -> {
+    PearlPearlPearl.fromItemStack(i.getItemStack()).ifPresent(pearl -> {
       pearl.setHolder(new PearlPearlHolder.Player(p.getUniqueId()));
       i.setItemStack(pearl.getItemRepr());
     });
