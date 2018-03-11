@@ -24,7 +24,6 @@ public final class PearlPearl extends ACivMod {
   private static PearlPearlListener listener;
   private static PearlPearlConfig config;
   private static PearlPearlDAO dao;
-  private static BukkitTask costTabulator;
 
   @Override
   public void onEnable(){
@@ -38,8 +37,7 @@ public final class PearlPearl extends ACivMod {
     PearlPearlPearl.loadPearls();
     // Enable aggro verifier
     PearlPearlCmdAggro.enableAggro();
-    // Pearl Decay
-    costTabulator = Bukkit.getScheduler().runTaskTimer(PearlPearl.getInstance(),PearlPearlPearl::pearlDecay, 20L, config.pearlDecayInterval);
+    PearlPearlPearl.startDecayTask();
     PearlPearlBehavior.startTasks();
     getServer().getPluginManager().registerEvents(listener, this);
     // Register commands

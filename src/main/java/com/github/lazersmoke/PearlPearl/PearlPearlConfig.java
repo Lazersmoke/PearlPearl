@@ -14,6 +14,9 @@ public final class PearlPearlConfig{
   public static double pearlDecayBase;
   public static double pearlDecayScale;
   public static double pearlDecayRange;
+  public static long pearlMaxDamage;
+  public static long pearlStartDamage;
+  public static long pearlBaseCost;
   public static int exileRadius;
   public static long pearlDecayInterval;
   public static final Map<PearlPearlBehavior,Integer> behaviorCosts = new LinkedHashMap<PearlPearlBehavior,Integer>();
@@ -25,6 +28,9 @@ public final class PearlPearlConfig{
     pearlDecayBase = config.getDouble("pearlDecayBase", 0.1);
     pearlDecayScale = config.getDouble("pearlDecayScale", 10.0);
     pearlDecayRange = config.getDouble("pearlDecayRange", 100.0);
+    pearlMaxDamage = config.getLong("pearlMaxDamage", 1000L);
+    pearlStartDamage = config.getLong("pearlStartDamage", 500L);
+    pearlBaseCost = config.getLong("pearlBaseCost", 1L);
     exileRadius = config.getInt("exileRadius", 1000);
     pearlDecayInterval = ConfigParsing.parseTime(config.getString("pearlDecayInterval", "1s"));
     prisonWorld = Bukkit.getWorld(config.getString("prisonWorld", "world_the_end"));

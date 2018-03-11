@@ -57,7 +57,7 @@ public final class PearlPearlPearl{
     String pearlerName = NameAPI.getCurrentName(pearler.getUniqueId());
     pearler.sendMessage(ChatColor.GREEN + "You pearled " + ChatColor.AQUA + pearledName);
     Optional.ofNullable(Bukkit.getPlayer(pearled)).ifPresent(p -> p.sendMessage(ChatColor.GOLD + "You got pearled by " + ChatColor.AQUA + pearlerName));
-    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlPearlHolder.Player(pearler.getUniqueId()), 0, 0);
+    PearlPearlPearl pearl = new PearlPearlPearl(UUID.randomUUID(), pearled, pearler.getUniqueId(), Instant.now(), new PearlPearlHolder.Player(pearler.getUniqueId()), PearlPearl.getConfiguration().pearlStartDamage, 0);
     allPearls.put(pearl.uniqueId,pearl);
     dao.addNewPearl(pearl);
     ItemStack pearlItem = pearl.getItemRepr();
@@ -192,6 +192,18 @@ public final class PearlPearlPearl{
 
   public void takeDamage(long dmg){
     damage += dmg;
+    if(damage > PearlPearl.getConfiguration().pearlMaxDamage){
+      freePearl("it ran out of fuel");
+    }
+  }
+
+  // Take the given cost as damage and return true, or it was too much damage, and return false
+  public boolean takeCost(long cost){
+    if(damage + cost > PearlPearl.getConfiguration().pearlMaxDamage){
+      damage += cost;
+      return true;
+    }
+    return false;
   }
 
   public static Optional<PearlPearlPearl> getPearlByUUID(UUID u){
@@ -227,11 +239,16 @@ public final class PearlPearlPearl{
       PearlPearlConfig c = PearlPearl.getConfiguration();
       // Take extra damage for enabled behaviors
       p.getBehaviors().forEach(b -> p.takeDamage(Optional.ofNullable(c.behaviorCosts.get(b)).map(Integer::longValue).orElse(0L)));
-      // Take one damage first
-      p.takeDamage(1L);
+      // Take base damage
+      p.takeDamage(c.pearlBaseCost);
       // Take extra damage for nearby pearls
       allPearls.forEach(p::takePearlCostFrom);
     });
+  }
+
+  public static void startDecayTask(){
+    // Pearl Decay
+    Bukkit.getScheduler().runTaskTimer(PearlPearl.getInstance(),PearlPearlPearl::pearlDecay, 20L, PearlPearl.getConfiguration().pearlDecayInterval);
   }
 
   public Set<PearlPearlBehavior> getBehaviors(){

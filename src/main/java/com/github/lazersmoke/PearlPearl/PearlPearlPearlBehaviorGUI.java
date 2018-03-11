@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.Date;
+import java.util.Optional;
 import java.text.SimpleDateFormat;
 import java.util.TimeZone;
 import java.time.Duration;
@@ -75,9 +76,14 @@ public class PearlPearlPearlBehaviorGUI{
     return new Clickable(toShow) {
       @Override
       public void clicked(Player p) {
-        boolean active = pearl.exhibitsBehavior(b);
-        p.sendMessage((active ? ChatColor.RED + "Disabled " : ChatColor.GREEN + "Enabled ") + b.name + " on that pearl");
-        pearl.setBehavior(b,!active);
+        boolean isDowngrade = pearl.exhibitsBehavior(b);
+        // If we are trying to upgrade with insufficent pearl health
+        if(!(isDowngrade || Optional.ofNullable(PearlPearl.getConfiguration().behaviorUpgradeCosts.get(b)).map(pearl::takeCost).orElse(true))){
+          p.sendMessage(ChatColor.RED + "That pearl doesn't have enough health to do that");
+          return;
+        }
+        p.sendMessage((isDowngrade ? ChatColor.RED + "Disabled " : ChatColor.GREEN + "Enabled ") + b.name + " on that pearl");
+        pearl.setBehavior(b,!isDowngrade);
         showScreen();
       }
     };

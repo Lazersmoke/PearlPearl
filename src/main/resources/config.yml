@@ -9,6 +9,22 @@ mysql:
   idleTimout: 600000
   maxLifetime: 7200000
 
+# Every pearlDecayInterval, the following happens for every pearl:
+#   - It takes pearlBaseCost damage.
+#   - It takes pearlDecayScale*pearlDecayBase^(x/pearlDecayRange) for every other pearl
+#     on the server, where x is the distance between the pearls.
+#   - For each behavior it has enabled, takes the `cost` of that behavior.
+pearlDecayInterval: 1s
+pearlBaseCost: 1
+pearlDecayBase: 0.1
+pearlDecayScale: 10.0
+pearlDecayRange: 100
+# Maximum damage a pearl can incur before being freed
+pearlMaxDamage: 1000
+# Starting damage on a newly created pearl
+pearlStartDamage: 500
+exileRadius:
+prisonWorld: 'world_the_end'
 enabledBehaviors:
   EXILE:
     cost: 10
